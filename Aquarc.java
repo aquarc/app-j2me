@@ -24,6 +24,7 @@ public class Aquarc extends MIDlet implements CommandListener, ItemStateListener
     private int questionIndex;
     private ChoiceGroup answerChoices;
     private char answer;
+    private String rationale;
 
     // what page are we on?
     private int page;
@@ -193,8 +194,9 @@ public class Aquarc extends MIDlet implements CommandListener, ItemStateListener
                 }
                 questions.append(answerChoices);
 
-                // add answer
+                // add answer and rationale
                 answer = questions_data.getObject(0).getString("answer").charAt(0);
+                rationale = questions_data.getObject(0).getString("rationale");
 
                 // add difficulty , skill, and domain
                 StringItem difficulty = new StringItem(null, questions_data.getObject(0).getString("difficulty"));
@@ -229,11 +231,11 @@ public class Aquarc extends MIDlet implements CommandListener, ItemStateListener
             if (answerChoices.getSelectedIndex() + 'A' == answer) {
                 System.out.println("correct");
                 // alert
-                alert = new Alert("Correct", "You got the answer right!", null, AlertType.INFO);
-                display.setCurrent(alert, null);
+                alert = new Alert("Correct", rationale, null, AlertType.INFO);
+                display.setCurrent(alert, questions);
             } else {
-                alert = new Alert("Correct", "You got the answer wrong!", null, AlertType.INFO);
-                System.out.println("incorrect");
+                alert = new Alert("Incorrect", rationale, null, AlertType.INFO);
+                display.setCurrent(alert, questions);
             }
         }
     }
