@@ -19,21 +19,21 @@ public class Aquarc extends MIDlet implements CommandListener, ItemStateListener
     private Command search;
     private Alert alert;
     private JSONArray questions_data;
+
+    private StringBuffer send;
+    private StringBuffer encodedOptions;
     // for the questions page
     private Form questions;
     private int questionIndex;
     private ChoiceGroup answerChoices;
     private char answer;
     private String rationale;
-
-    // what page are we on?
-    private int page;
+    private Command back, next;
 
     public Aquarc() {
         choices = new ChoiceGroup[5];
 
         questionIndex = 0;
-        page = 0;
 
         display = Display.getDisplay(this);
         form = new Form("aquarc Eng SAT Qs");
@@ -114,128 +114,172 @@ public class Aquarc extends MIDlet implements CommandListener, ItemStateListener
             destroyApp(false);
             notifyDestroyed();
         }
+
         if (c == search) {
-            if (page == 0) {
-                // design the HTTP query
-                StringBuffer send = new StringBuffer("http://localhost:8080/legacy/sat-q/");
-                int realIndex = 0;
-                for (int i = 0; i < choices.length; i++) {
-                    boolean[] flags = new boolean[choices[i].size()];
-                    choices[i].getSelectedFlags(flags);
-                    for (int j = 0; j < flags.length; j++) {
-                        if (flags[j]) {
-                            send.append((char) ('a' + realIndex));
-                        }
-                        realIndex++;
+           // design the HTTP query
+           send = new StringBuffer("http://localhost:8080/legacy/sat-q/");
 
-                    }
+           encodedOptions = new StringBuffer();
+           int realIndex = 0;
+           for (int i = 0; i < choices.length; i++) {
+               boolean[] flags = new boolean[choices[i].size()];
+               choices[i].getSelectedFlags(flags);
+               for (int j = 0; j < flags.length; j++) {
+                   if (flags[j]) {
+                       encodedOptions.append((char) ('a' + realIndex));
+                   }
+                   realIndex++;
+               }
+           } 
 
-                } 
-
-                // actually query
-
-                HttpConnection connection = null;
-                InputStream in = null;
-                StringBuffer buffer = new StringBuffer();
-
-                try {
-                    connection = (HttpConnection) Connector.open(send.toString());
-                } catch (IOException e) {
-                    // ALERT the user
-                    alert = new Alert("Failure", "Unable to open socket with Aquarc's servers", null, AlertType.ERROR);
-                    alert.setTimeout(2500);
-                    display.setCurrent(alert, null);
-                }
-
-                try {
-                    in = connection.openInputStream();
-                } catch (IOException e) {
-                     //ALERT the user
-                    alert = new Alert("Failure", "Unable to open input stream with Aquarc's servers", null, AlertType.ERROR);
-                    alert.setTimeout(2500);
-                    display.setCurrent(alert, null);
-                }
-                int ch;
-                try {
-                    while ((ch = in.read()) != -1) {
-                        buffer.append((char)ch);
-                    } 
-                } catch (IOException e) {
-                    //ALERT the user
-                    alert = new Alert("Failure", "Data reading error", null, AlertType.ERROR);
-                    alert.setTimeout(Alert.FOREVER);
-                    display.setCurrent(alert, null);
-                }
-                String line = new String (buffer.toString());
-                questions_data = JSON.getArray(line);
-
-
-                System.out.println(questions_data.size());
-                // now you want to parse the JSON and make an array of it.
-                // time to make a new Form for the display
-
-                page = 1;
+           // actually query
+           downloadQuestions(0);
+           loadQuestion();
+       } else if (c == next) {
+           // Prevent incrementing beyond the last question
+           if (questions_data.size() == 0) {
                 questionIndex = 0;
-                questions = new Form("Question " + (questionIndex + 1) + " of " + questions_data.size());
-
-                // put details first then the question
-                StringItem details = new StringItem(null, questions_data.getObject(0).getString("details"));
-                questions.append(details);
-                // add question
-                StringItem question = new StringItem(null, questions_data.getObject(0).getString("question"));
-                questions.append(question);
-
-                answerChoices = new ChoiceGroup(null, Choice.EXCLUSIVE);
-                JSONArray answerChoicesData = questions_data.getObject(0).getArray("answerChoices");
-                for (int i = 0; i < answerChoicesData.size(); i++) {
-                    answerChoices.setSelectedIndex(
-                        answerChoices.append(answerChoicesData.getString(i), null),
-                    false);
-                }
-                questions.append(answerChoices);
-
-                // add answer and rationale
-                answer = questions_data.getObject(0).getString("answer").charAt(0);
-                rationale = questions_data.getObject(0).getString("rationale");
-
-                // add difficulty , skill, and domain
-                StringItem difficulty = new StringItem(null, questions_data.getObject(0).getString("difficulty"));
-                questions.append(difficulty);
-                StringItem domain = new StringItem(null, questions_data.getObject(0).getString("domain"));
-                questions.append(domain);
-                StringItem skill = new StringItem(null, questions_data.getObject(0).getString("skill"));
-                questions.append(skill);
-
-                // add commands to go back and to the next question
-
-                Command back = new Command("Back", Command.BACK, 1);
-                Command next = new Command("Next", Command.OK, 1);
-                questions.addCommand(back);
-                questions.addCommand(next);
-                questions.setCommandListener(this);
-                questions.setItemStateListener(this);
-
-
-                // TODO: answer and rationale in ALERT
-                display.setCurrent(questions);
-            } else if (page == 1) {
-                // make a new form I guess
-            }
-        }
+                downloadQuestions(0);
+                loadQuestion();
+           } else if (questionIndex % questions_data.size() < questions_data.size() - 1) {
+               questionIndex++;
+               loadQuestion();
+           } else {
+               questionIndex++;
+               downloadQuestions(questionIndex + 1);
+               loadQuestion();
+           }
+        } else if (c == back) {
+           if (questionIndex % questions_data.size() > 0) {
+               questionIndex--;
+               loadQuestion();
+           } else if (questionIndex % questions_data.size() == 0 && questionIndex > 0) {
+               questionIndex--;
+               downloadQuestions(questionIndex - 9);
+               loadQuestion();
+           } else if (questionIndex <= 0) {
+               display.setCurrent(form);
+           } 
+        } 
     }
 
     public void itemStateChanged(Item item) {
         // page 1
         if (item == answerChoices) {
-            System.out.println("Answer: " + answerChoices.getSelectedIndex());
             if (answerChoices.getSelectedIndex() + 'A' == answer) {
-                System.out.println("correct");
                 // alert
                 alert = new Alert("Correct", rationale, null, AlertType.INFO);
                 display.setCurrent(alert, questions);
             } else {
                 alert = new Alert("Incorrect", rationale, null, AlertType.INFO);
                 display.setCurrent(alert, questions);
+            }
+        }
+    }
+
+    public void loadQuestion() {
+           // Validate questionIndex range
+           if (questionIndex < 0) {
+               alert = new Alert("Error", "Invalid question index.", null, AlertType.ERROR);
+               display.setCurrent(alert, form); // Return to main form
+               return;
+           }
+
+           if (questions_data.size() == 0) {
+               alert = new Alert("Error", "No questions found. If you try again, you will start again at the first question.", null, AlertType.ERROR);
+               display.setCurrent(alert, questions); // Return to previous question
+               questionIndex--;
+               return;
+           }
+
+           questions = new Form("Question " + (questionIndex % questions_data.size() + 1) + " of " + questions_data.size());
+
+           // put details first then the question
+           StringItem details = new StringItem(null, questions_data.getObject(questionIndex % questions_data.size()).getString("details"));
+           questions.append(details);
+           // add question
+           StringItem question = new StringItem(null, questions_data.getObject(questionIndex % questions_data.size()).getString("question"));
+           questions.append(question);
+
+           answerChoices = new ChoiceGroup(null, Choice.EXCLUSIVE);
+           // Inside loadQuestion()
+           JSONArray answerChoicesData = questions_data.getObject(questionIndex % questions_data.size()).getArray("answerChoices");
+           if (answerChoicesData.size() == 0) {
+               // Handle empty answer choices (e.g., show an error)
+               alert = new Alert("Error", "No answer choices provided.", null, AlertType.ERROR);
+               display.setCurrent(alert, questions);
+               return; // Skip further processing
+           }
+
+            // Populate answerChoices only if data exists
+           answerChoices = new ChoiceGroup(null, Choice.EXCLUSIVE);
+           for (int i = 0; i < answerChoicesData.size(); i++) {
+               answerChoices.append(answerChoicesData.getString(i), null);
+           }
+           questions.append(answerChoices);
+
+           // add answer and rationale
+           answer = questions_data.getObject(questionIndex % questions_data.size()).getString("answer").charAt(0);
+           rationale = questions_data.getObject(questionIndex % questions_data.size()).getString("rationale");
+
+           // add difficulty , skill, and domain
+           StringItem difficulty = new StringItem(null, questions_data.getObject(questionIndex % questions_data.size()).getString("difficulty"));
+           questions.append(difficulty);
+           StringItem domain = new StringItem(null, questions_data.getObject(questionIndex % questions_data.size()).getString("domain"));
+           questions.append(domain);
+           StringItem skill = new StringItem(null, questions_data.getObject(questionIndex % questions_data.size()).getString("skill"));
+           questions.append(skill);
+
+           // add commands to go back and to the next question
+
+           back = new Command("Back", Command.BACK, 1);
+           next = new Command("Next", Command.OK, 1);
+           questions.addCommand(back);
+           questions.addCommand(next);
+           questions.setCommandListener(this);
+           questions.setItemStateListener(this);
+
+           display.setCurrent(questions);
+    } 
+
+    public void downloadQuestions(int offset) {
+        HttpConnection connection = null;
+        InputStream in = null;
+        ByteArrayOutputStream byteOut = null; // To store raw bytes
+
+        StringBuffer urlBuffer = new StringBuffer(send.toString());
+        if (offset != 0) {
+            urlBuffer.append(offset);
+        }
+        urlBuffer.append(encodedOptions.toString());
+
+        try {
+            connection = (HttpConnection) Connector.open(urlBuffer.toString());
+            in = connection.openInputStream();
+
+            // Read all bytes into a byte array
+            byteOut = new ByteArrayOutputStream();
+            int bytesRead;
+            byte[] buffer = new byte[1024];
+            while ((bytesRead = in.read(buffer)) != -1) {
+                byteOut.write(buffer, 0, bytesRead);
+            }
+
+            // Convert bytes to UTF-8 string
+            String jsonResponse = byteOut.toString("UTF-8");
+            questions_data = JSON.getArray(jsonResponse);
+
+        } catch (IOException e) {
+            alert = new Alert("Error", "Connection failed: " + e.getMessage(), null, AlertType.ERROR);
+            alert.setTimeout(Alert.FOREVER);
+            display.setCurrent(alert, form);
+        } finally {
+            try {
+                if (byteOut != null) byteOut.close();
+                if (in != null) in.close();
+                if (connection != null) connection.close();
+            } catch (IOException e) {
+                // Ignore
             }
         }
     }
