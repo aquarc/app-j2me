@@ -25,3 +25,11 @@ cd app-j2me
 
 git clone https://github.com/shinovon/NNJSON
 ```
+
+## build
+
+```sh
+export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
+./build.sh
+```
+You can use `MicroEmulator` to emulate it.

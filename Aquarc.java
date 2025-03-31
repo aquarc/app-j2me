@@ -117,7 +117,7 @@ public class Aquarc extends MIDlet implements CommandListener, ItemStateListener
 
         if (c == search) {
            // design the HTTP query
-           send = new StringBuffer("http://localhost:8080/legacy/sat-q/");
+           send = new StringBuffer("http://j2me.aquarc.org/legacy/sat-q/");
 
            encodedOptions = new StringBuffer();
            int realIndex = 0;
