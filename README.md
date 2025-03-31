@@ -9,6 +9,13 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
 
 ## build
 get the library files from the same place as discord j2me. You can also develop your own j2me apps using these libraries.
+```sh
+curl -O https://github.com/vipaoL/j2me-build-tools/raw/c1598b6916f2ba2ad5be1c0accd1ed2a54c156f3/WTK2.5.2/lib/midpapi20.jar
+curl -O https://github.com/vipaoL/j2me-build-tools/raw/c1598b6916f2ba2ad5be1c0accd1ed2a54c156f3/WTK2.5.2/lib/cldcapi10.jar
+curl -O https://github.com/vipaoL/j2me-build-tools/raw/c1598b6916f2ba2ad5be1c0accd1ed2a54c156f3/WTK2.5.2/lib/jsr75.jar
+curl -O https://nnp.nnchan.ru/pna/lib/javapiglerapi.jar
+curl -O https://github.com/vipaoL/j2me-build-tools/raw/refs/heads/master/lib/nokiaui.jar
+```
 
 Then git clone NNJSON inside the directory:
 
